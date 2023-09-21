@@ -1,6 +1,5 @@
 import logging
 from os import getenv
-from dataclasses import dataclass
 
 from netsquid.qubits.dmutil import dm_fidelity
 from netsquid.qubits import ketstates, ketutil
@@ -15,7 +14,9 @@ from squidasm.run.stack.config import (
 from squidasm.run.stack.run import run
 from squidasm.sim.stack.common import LogManager
 from squidasm.sim.stack.program import Program, ProgramContext, ProgramMeta
-from squidasm.util import create_two_node_network, get_qubit_state
+from squidasm.util import get_qubit_state
+
+from utils import getenv_or_default
 
 
 def create_network(link_noise: float):
@@ -116,11 +117,15 @@ class ReceiverProgram(Program):
             self.logger.info(f"#{i} EPR pair received")
             qubit_sender = get_qubit_state(epr, "Sender")
             qubit_receiver = get_qubit_state(epr, "Receiver")
-            f_sender = float(dm_fidelity(qubit_sender, ketutil.reduced_dm(ketstates.b00, [0])))
-            f_receiver = float(dm_fidelity(qubit_receiver, ketutil.reduced_dm(ketstates.b00, [0])))
-            assert int(10000*f_sender) == int(10000*f_receiver)
+            f_sender = float(
+                dm_fidelity(qubit_sender, ketutil.reduced_dm(ketstates.b00, [0]))
+            )
+            f_receiver = float(
+                dm_fidelity(qubit_receiver, ketutil.reduced_dm(ketstates.b00, [0]))
+            )
+            assert int(10000 * f_sender) == int(10000 * f_receiver)
             fidelities.append(f_sender)
-                
+
             # Notify the peer that it can proceed
             csocket.send("pong")
 
@@ -138,9 +143,7 @@ if __name__ == "__main__":
     cfg = create_network(0.95)
 
     # Create instances of programs to run
-    num_epr_pairs = (
-        10 if getenv("NUM_EPR_PAIRS") is None else int(getenv("NUM_EPR_PAIRS"))
-    )
+    num_epr_pairs = int(getenv_or_default("NUM_EPR_PAIRS", "10"))
     sender_program = SenderProgram(num_epr_pairs)
     receiver_program = ReceiverProgram()
 
