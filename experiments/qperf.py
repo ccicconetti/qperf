@@ -2,6 +2,8 @@ import logging
 from os import getenv
 import numpy as np
 
+import matplotlib.pyplot as plt
+
 from netsquid.qubits.dmutil import dm_fidelity
 from netsquid.qubits import ketstates, ketutil
 from netsquid.util.simtools import sim_time, MILLISECOND
@@ -23,6 +25,19 @@ from squidasm.sim.stack.program import Program, ProgramContext, ProgramMeta
 from squidasm.util import get_qubit_state
 
 from utils import getenv_or_default, fredkin
+
+
+def compute_s(outer_list: list) -> float:
+    sum = 0.0
+    count = 0
+    for inner_list in outer_list:
+        count += len(inner_list)
+        for value in inner_list:
+            sum += value
+
+    assert count > 0
+
+    return 1.0 - 2.0 * sum / count
 
 
 def create_network(link_noise: float):
@@ -228,30 +243,55 @@ class ReceiverProgram(Program):
 
 
 if __name__ == "__main__":
-    # Create a network configuration
-    cfg = create_network(0)
+    x_values = []
+    s_values = []
+    for link_noise_int in range(0, 81, 20):
+        link_noise = link_noise_int / 100.0
 
-    # Read the number of tests to perform from environment variable P
-    P = int(getenv_or_default("P", "10"))
-    LOG_LEVEL = getenv_or_default("LOG_LEVEL", "INFO")
-    SEED = int(getenv_or_default("SEED", "0"))
+        x_values.append(link_noise)
 
-    # Draw random values to initialize the states to be teleported
-    rng = np.random.default_rng(SEED)
-    (phi, theta) = (
-        rng.random() * np.pi,
-        rng.random() * np.pi,
-    )
+        # Create a network configuration
+        cfg = create_network(link_noise)
 
-    # Create instances of programs to run
-    sender_program = SenderProgram(P, phi, theta, LOG_LEVEL)
-    receiver_program = ReceiverProgram(LOG_LEVEL)
+        # Read the number of tests to perform from environment variable P
+        OUTPUT = getenv_or_default("OUTPUT", "")
+        P = int(getenv_or_default("P", "10"))
+        LOG_LEVEL = getenv_or_default("LOG_LEVEL", "WARNING")
+        SEED = int(getenv_or_default("SEED", "0"))
+        PLOT = getenv_or_default("PLOT", "")
 
-    # Run the simulation.
-    swap_measurements, _ = run(
-        config=cfg,
-        programs={"Receiver": receiver_program, "Sender": sender_program},
-        num_times=2,
-    )
+        # Draw random values to initialize the states to be teleported
+        rng = np.random.default_rng(SEED)
+        (phi, theta) = (
+            rng.random() * np.pi,
+            rng.random() * np.pi,
+        )
 
-    print(swap_measurements)
+        # Create instances of programs to run
+        sender_program = SenderProgram(P, phi, theta, LOG_LEVEL)
+        receiver_program = ReceiverProgram(LOG_LEVEL)
+
+        # Run the simulation.
+        swap_measurements, _ = run(
+            config=cfg,
+            programs={"Receiver": receiver_program, "Sender": sender_program},
+            num_times=1,
+        )
+
+        s_values.append(compute_s(swap_measurements))
+
+    assert len(s_values) == len(x_values)
+
+    if OUTPUT != "":
+        with open(OUTPUT, "w") as outfile:
+            for x, s in zip(x_values, s_values):
+                outfile.write(f"{x} {s}\n")
+
+    if PLOT != "":
+        fig, ax = plt.subplots()
+        ax.plot(x_values, s_values)
+
+        ax.set(xlabel="link noise rate", ylabel="fidelity")
+        ax.grid()
+
+        plt.show()
