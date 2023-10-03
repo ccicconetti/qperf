@@ -1,4 +1,5 @@
 import logging
+import argparse
 from os import getenv
 import numpy as np
 
@@ -243,6 +244,33 @@ class ReceiverProgram(Program):
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(
+        "Measure the performance of a quantum link through swap tests",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+    )
+    parser.add_argument(
+        "--output",
+        type=str,
+        default="",
+        help="Name of the file where to save the output samples",
+    )
+    parser.add_argument(
+        "--plot", action="store_true", default=False, help="Show the samples on a plot"
+    )
+    parser.add_argument(
+        "--log-level", type=str, default="WARNING", help="Set the log level"
+    )
+    parser.add_argument(
+        "--seed",
+        type=int,
+        default=1,
+        help="Seed to use for the initialization of the pseudo-random number generators",
+    )
+    parser.add_argument(
+        "--num-experiments", type=int, default=10, help="Number of experiments to run"
+    )
+    args = parser.parse_args()
+
     x_values = []
     s_values = []
     for link_noise_int in range(0, 81, 20):
@@ -253,23 +281,16 @@ if __name__ == "__main__":
         # Create a network configuration
         cfg = create_network(link_noise)
 
-        # Read the number of tests to perform from environment variable P
-        OUTPUT = getenv_or_default("OUTPUT", "")
-        P = int(getenv_or_default("P", "10"))
-        LOG_LEVEL = getenv_or_default("LOG_LEVEL", "WARNING")
-        SEED = int(getenv_or_default("SEED", "0"))
-        PLOT = getenv_or_default("PLOT", "")
-
         # Draw random values to initialize the states to be teleported
-        rng = np.random.default_rng(SEED)
+        rng = np.random.default_rng(args.seed)
         (phi, theta) = (
             rng.random() * np.pi,
             rng.random() * np.pi,
         )
 
         # Create instances of programs to run
-        sender_program = SenderProgram(P, phi, theta, LOG_LEVEL)
-        receiver_program = ReceiverProgram(LOG_LEVEL)
+        sender_program = SenderProgram(args.num_experiments, phi, theta, args.log_level)
+        receiver_program = ReceiverProgram(args.log_level)
 
         # Run the simulation.
         swap_measurements, _ = run(
@@ -282,12 +303,12 @@ if __name__ == "__main__":
 
     assert len(s_values) == len(x_values)
 
-    if OUTPUT != "":
-        with open(OUTPUT, "w") as outfile:
+    if args.output != "":
+        with open(args.output, "w") as outfile:
             for x, s in zip(x_values, s_values):
                 outfile.write(f"{x} {s}\n")
 
-    if PLOT != "":
+    if args.plot:
         fig, ax = plt.subplots()
         ax.plot(x_values, s_values)
 
