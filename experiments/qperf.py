@@ -3,8 +3,6 @@ import argparse
 from os import getenv
 import numpy as np
 
-import matplotlib.pyplot as plt
-
 from netsquid.qubits.dmutil import dm_fidelity
 from netsquid.qubits import ketstates, ketutil
 from netsquid.util.simtools import sim_time, MILLISECOND
@@ -267,50 +265,58 @@ if __name__ == "__main__":
         help="Seed to use for the initialization of the pseudo-random number generators",
     )
     parser.add_argument(
-        "--num-experiments", type=int, default=10, help="Number of experiments to run"
+        "--num-experiments", type=int, default=5, help="Number of experiments to run"
+    )
+    parser.add_argument(
+        "--num-samples", type=int, default=10, help="Number of samples per experiment"
     )
     args = parser.parse_args()
 
-    x_values = []
-    s_values = []
-    for link_noise_int in range(0, 81, 20):
-        link_noise = link_noise_int / 100.0
+    x_values = np.arange(0, 1, 0.1)
+    s_values = np.zeros(len(x_values))
+    e_values = np.zeros(len(x_values))
+    for cnt, x in zip(range(len(x_values)), x_values):
+        samples = np.zeros(args.num_experiments)
+        for experiment_id in range(args.num_experiments):
+            # Create a network configuration
+            cfg = create_network(x)
 
-        x_values.append(link_noise)
+            # Draw random values to initialize the states to be teleported
+            rng = np.random.default_rng(args.seed)
+            (phi, theta) = (
+                rng.random() * np.pi,
+                rng.random() * np.pi,
+            )
 
-        # Create a network configuration
-        cfg = create_network(link_noise)
+            # Create instances of programs to run
+            sender_program = SenderProgram(args.num_samples, phi, theta, args.log_level)
+            receiver_program = ReceiverProgram(args.log_level)
 
-        # Draw random values to initialize the states to be teleported
-        rng = np.random.default_rng(args.seed)
-        (phi, theta) = (
-            rng.random() * np.pi,
-            rng.random() * np.pi,
-        )
+            # Run the simulation.
+            swap_measurements, _ = run(
+                config=cfg,
+                programs={"Receiver": receiver_program, "Sender": sender_program},
+                num_times=1,
+            )
 
-        # Create instances of programs to run
-        sender_program = SenderProgram(args.num_experiments, phi, theta, args.log_level)
-        receiver_program = ReceiverProgram(args.log_level)
+            samples[experiment_id] = compute_s(swap_measurements)
 
-        # Run the simulation.
-        swap_measurements, _ = run(
-            config=cfg,
-            programs={"Receiver": receiver_program, "Sender": sender_program},
-            num_times=1,
-        )
-
-        s_values.append(compute_s(swap_measurements))
-
-    assert len(s_values) == len(x_values)
+        s_values[cnt] = np.mean(samples)
+        e_values[cnt] = np.std(samples)
 
     if args.output != "":
         with open(args.output, "w") as outfile:
-            for x, s in zip(x_values, s_values):
-                outfile.write(f"{x} {s}\n")
+            for x, s, e in zip(x_values, s_values, e_values):
+                outfile.write(f"{x:4f} {s:4f} {e:4f}\n")
 
     if args.plot:
+        from matplotlib import pyplot as plt
+
         fig, ax = plt.subplots()
-        ax.plot(x_values, s_values)
+        ax.plot(x_values, s_values, "b-", linewidth=2)
+        ax.fill_between(
+            x_values, s_values - e_values, s_values + e_values, linewidth=0, alpha=0.2
+        )
 
         ax.set(xlabel="link noise rate", ylabel="fidelity")
         ax.grid()
