@@ -3,8 +3,6 @@ import argparse
 from os import getenv
 import numpy as np
 
-from netsquid.qubits.dmutil import dm_fidelity
-from netsquid.qubits import ketstates, ketutil
 from netsquid.util.simtools import sim_time, MILLISECOND
 
 from netqasm.sdk import Qubit
@@ -75,7 +73,7 @@ class SenderProgram(Program):
             name="qperf",
             csockets=[self.PEER_NAME],
             epr_sockets=[self.PEER_NAME],
-            max_qubits=10,
+            max_qubits=3,
         )
 
     def run(self, context: ProgramContext):
@@ -137,7 +135,7 @@ class ReceiverProgram(Program):
             name="qperf",
             csockets=[self.PEER_NAME],
             epr_sockets=[self.PEER_NAME],
-            max_qubits=4,
+            max_qubits=3,
         )
 
     def run(self, context: ProgramContext):
@@ -157,7 +155,6 @@ class ReceiverProgram(Program):
             # Local qubits
             q1 = Qubit(connection)
             q2 = Qubit(connection)
-            q3 = Qubit(connection)
             yield from connection.flush()
 
             for stage in range(2):
@@ -220,11 +217,11 @@ class ReceiverProgram(Program):
 
                 else:
                     assert stage == 1
-
-                    q3.H()
-                    fredkin(q3, q2, epr)
-                    q3.H()
-                    m = q3.measure()
+                    q1 = Qubit(connection)
+                    q1.H()
+                    fredkin(q1, q2, epr)
+                    q1.H()
+                    m = q1.measure()
                     yield from connection.flush()
 
                     swap_measurements.append(int(m))
