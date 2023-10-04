@@ -22,18 +22,22 @@ To this purpose, we propose `qperf`, whose name is inspired from the tool [iperf
 
 ## Realization
 
-We propose to realize quantum link performance measurement between two end nodes Alice and Bob using the [swap test](https://en.wikipedia.org/wiki/Swap_test), which is a known technique to estimate the squared inner product between two states, $|\langle \psi,\psi'\rangle|^2$, by measuring an ancilla used as the control qubit of a [Fredkin gate](https://en.wikipedia.org/wiki/Fredkin_gate)
-.
+We propose to realize quantum link performance measurement between two end nodes Alice and Bob using the [swap test](https://en.wikipedia.org/wiki/Swap_test), which is a known technique to estimate the squared inner product between two states, $|\langle \psi,\psi'\rangle|^2$, by measuring an ancilla used as the control qubit of a [Fredkin gate](https://en.wikipedia.org/wiki/Fredkin_gate):
+
+![](qperf-swap-test.png)
 
 The two states $|\psi\rangle$ and $|\psi'\rangle$ are prepared as the same state by Alice and the teleported one after another to Bob, which performs the swap test.
 
 The procedure requires that:
 
 - end-to-end entangled EPR pairs can be generated between Alice and Bob;
-- Alice can prepare a known state on a local qubit;
 - Bob has two local qubits (one is used to keep the teleported state, the other as the ancilla of the Fredkin gate);
-- Alice can generated a local qubit initialized at a known state and it implements the Hadamard and CNOT gate;
-- Bob implements the following gates: H, X, Z, Fredkin (or c-SWAP).
+- Alice can generate a local qubit initialized at a known state;
+- the following gates are supported by the two parties:
+  - Alice: H, CNOT;
+  - Bob: H, X, Z, Fredkin (c-SWAP).
+
+![](qperf-alice-bob.png)
 
 The overall circuit is shown below:
 
@@ -104,4 +108,16 @@ export NETSQUIDPYPI_PWD=password1234
 thirdparty/setup.sh
 source .venv/bin/activate
 python experiments/qperf.py --help
+```
+
+With [multipass](https://multipass.run/) you can create a clean Ubuntu 22.04 virtual machine, with 5 CPU cores and 8 GB of RAM, called `squidasm` with the following command:
+
+```bash
+sudo multipass launch -c 5 -m 8G -n squidasm 22.04
+```
+
+Then, you can enter the VM with:
+
+```bash
+sudo multipass shell squidasm
 ```
