@@ -1,3 +1,17 @@
+"""A quantum link performance measurement tool for SquidASM
+
+Simulation that performs a swap test between qubits teleported from
+a node to another across a two-node quantum network with depolarizing
+quantum link.
+
+The swap test provides information on the end-to-end fidelity of
+all the operations involved in the teleportation: EPR pair exchange
+and local quantum operations performed by the receiver.
+
+The simulation parameters and output can be controlled through
+command-line options, use --help to check all the available configurations.
+"""
+
 import logging
 import argparse
 from os import getenv
@@ -21,10 +35,22 @@ from squidasm.sim.stack.common import LogManager
 from squidasm.sim.stack.program import Program, ProgramContext, ProgramMeta
 from squidasm.util import get_qubit_state
 
-from utils import getenv_or_default, fredkin
+from utils import fredkin
 
 
 def compute_s(outer_list: list) -> float:
+    """Compute the swap test output from a number of samples
+
+    Parameters
+    ----------
+    outer_list: list
+        List of list of binary values
+
+    Returns
+    -------
+    float
+        The different between 1 and twice the expectation of the values passed.
+    """
     sum = 0.0
     count = 0
     for inner_list in outer_list:
@@ -38,6 +64,20 @@ def compute_s(outer_list: list) -> float:
 
 
 def create_network(link_noise: float):
+    """Create a simple network with two NV quantum nodes interconnected
+    by a depolarising link with configurable link noise.
+
+    Parameters
+    ----------
+    link_noise: float
+        The noise of the link between the two nodes, where 0 means ideal
+        link (no depolarization).
+
+    Returns
+    -------
+    StackNetworkConfig
+        the network created
+    """
     node_names = ["Receiver", "Sender"]
 
     qdevice_cfg = NVQDeviceConfig.perfect_config()
@@ -60,6 +100,19 @@ class SenderProgram(Program):
     PEER_NAME = "Receiver"
 
     def __init__(self, P: int, phi: float, theta: float, LOG_LEVEL: str):
+        """Initialize the sender program
+
+        Parameters
+        ----------
+        P: int
+            The number of measurements to make.
+        phi: float
+            The phi angle to rotate the initial state.
+        theta: float
+            The theta angle to rotate the initial state.
+        LOG_LEVEL: str
+            A string representation of the logging level to enable.
+        """
         self._P = P
         self._phi = phi
         self._theta = theta

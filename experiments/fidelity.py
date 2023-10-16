@@ -1,3 +1,22 @@
+"""Example SquidASM program that measures fidelity of EPR pairs exchanged
+
+Two quantum nodes are interconnected with a quantum link.
+
+The sender initially sends to the receiver the number of EPR pairs that
+will be exchanged. Afterwards, they both receive EPR pairs back-to-back,
+and the receiver measures the fidelity of the two qubits (this operation
+is only possible in simulations because the two states reside in
+systems that are physically separated from one another).
+
+The fidelity measurements can be saved in an output file specified by
+the environment variable OUTFILE.
+
+The number of EPR pairs to generate are specified by the environment
+variable NUM_EPR_PAIRS.
+
+The logging level is set according to the LOG_LEVEL environment variable.
+"""
+
 import logging
 from os import getenv
 
@@ -20,6 +39,20 @@ from utils import getenv_or_default
 
 
 def create_network(link_noise: float):
+    """Create a simple network with two ideal quantum nodes interconnected
+    by a depolarising link with configurable link noise.
+
+    Parameters
+    ----------
+    link_noise: float
+        The noise of the link between the two nodes, where 0 means ideal
+        link (no depolarization).
+
+    Returns
+    -------
+    StackNetworkConfig
+        the network created
+    """
     node_names = ["Receiver", "Sender"]
 
     qdevice_cfg = GenericQDeviceConfig.perfect_config()
@@ -104,7 +137,7 @@ class ReceiverProgram(Program):
         # Receive from peer the number of expected EPR pairs
         num_epr_pairs = yield from csocket.recv()
         num_epr_pairs = int(num_epr_pairs)
-        print(f"Receiver expects {num_epr_pairs} EPR pairs")
+        self.logger.info(f"Receiver expects {num_epr_pairs} EPR pairs")
 
         fidelities = []
         for i in range(num_epr_pairs):
@@ -147,9 +180,10 @@ if __name__ == "__main__":
     sender_program = SenderProgram(num_epr_pairs)
     receiver_program = ReceiverProgram()
 
-    # toggle logging. Set to logging.INFO for logging of events.
-    receiver_program.logger.setLevel(logging.INFO)
-    sender_program.logger.setLevel(logging.INFO)
+    # Set logging level
+    log_level = logging.getLevelName(getenv_or_default("LOG_LEVEL", "WARNING"))
+    receiver_program.logger.setLevel(log_level)
+    sender_program.logger.setLevel(log_level)
 
     # Run the simulation.
     fidelities, _ = run(
@@ -158,6 +192,8 @@ if __name__ == "__main__":
         num_times=1,
     )
 
-    with open("out.dat", "w") as outfile:
-        for f in fidelities[0]:
-            outfile.write(f"{f}\n")
+    output_filename = getenv_or_default("OUTFILE", "")
+    if output_filename:
+        with open(output_filename, "w") as outfile:
+            for f in fidelities[0]:
+                outfile.write(f"{f}\n")

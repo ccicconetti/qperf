@@ -1,8 +1,19 @@
+"""Example SquidASM program to test the Fredkin gate
+
+The simulation consists of a single NV quantum node that repeatedly prepares 
+pairs of qubits in an initial random rate and then performs a
+swap test using a Fredkin gate, also known as controlled SWAP gate.
+
+Environment variables:
+
+- LOG_LEVEL: controls the logging level
+- NUM_ITERATIONS: specifies the number of tests to perform
+"""
+
 import logging
 import numpy as np
 
 from netqasm.sdk.qubit import Qubit
-from netqasm.sdk.toolbox.state_prep import set_qubit_state
 
 from squidasm.run.stack.config import NVQDeviceConfig, StackConfig, StackNetworkConfig
 from squidasm.run.stack.run import run
@@ -78,7 +89,7 @@ class ClientProgram(Program):
 
 
 if __name__ == "__main__":
-    LogManager.set_log_level(getenv_or_default("LOG_LEVEL", "WARNING"))
+    log_level = logging.getLevelName(getenv_or_default("LOG_LEVEL", "WARNING"))
 
     qdevice_cfg = NVQDeviceConfig.perfect_config()
     qdevice_cfg.num_qubits = 3
@@ -91,8 +102,8 @@ if __name__ == "__main__":
 
     num_times = int(getenv_or_default("NUM_ITERATIONS", "100"))
     client_program = ClientProgram()
-    client_program._logger.setLevel(logging.INFO)
+    client_program._logger.setLevel(log_level)
 
     run(cfg, {"client": client_program}, num_times=num_times)
 
-    print(f"{client_program._errors / num_times}")
+    print(f"error ratio: {client_program._errors / num_times}")

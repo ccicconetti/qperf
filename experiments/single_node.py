@@ -1,3 +1,19 @@
+"""Example SquidASM program to test the reliability of a quantum node
+
+The simulation consists of a single quantum node that repeatedly prepares 
+three qubits in an initial random state, then check that the output state
+is always the same across consecutive repetitions.
+
+With an ideal quantum node the expected behavior is that no error
+ever occur, while errors may happen with a non-ideal quantum node.
+
+Environment variables:
+
+- LOG_LEVEL: controls the logging level
+- NUM_ITERATIONS: specifies the number of tests to perform
+- DEVICE_TYPE: quantum processor type, can be one of: GENERIC, NV
+"""
+
 import logging
 import numpy as np
 from numpy import linalg as LA
@@ -32,7 +48,6 @@ class ClientProgram(Program):
     def __init__(self):
         self._logger = LogManager.get_stack_logger(self.__class__.__name__)
         self._last_state = None
-        self._errors = 0
         self._phis = [np.random.random() * np.pi for _ in range(3)]
         self._thetas = [np.random.random() * np.pi for _ in range(3)]
         self._norms = []
@@ -65,7 +80,7 @@ class ClientProgram(Program):
 
 
 if __name__ == "__main__":
-    LogManager.set_log_level(getenv_or_default("LOG_LEVEL", "WARNING"))
+    log_level = logging.getLevelName(getenv_or_default("LOG_LEVEL", "WARNING"))
 
     device_type = getenv_or_default("DEVICE_TYPE", "NV")
     assert device_type in ["NV", "GENERIC"]
@@ -86,7 +101,7 @@ if __name__ == "__main__":
     num_times = int(getenv_or_default("NUM_ITERATIONS", "10"))
 
     client_program = ClientProgram()
-    client_program._logger.setLevel(logging.INFO)
+    client_program._logger.setLevel(log_level)
 
     run(cfg, {"client": client_program}, num_times=num_times)
 
