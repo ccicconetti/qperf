@@ -101,10 +101,11 @@ which runs 10 experiments, each consisting of 100 measurements, for 10 possible 
 Tested on a clean Ubuntu 22.04 (_use real credentials instead of `user1234`/`password1234` obtained from the [netsquid forum](https://forum.netsquid.org/ucp.php?mode=register)_):
 
 ```bash
-git clone https://github.com/ccicconetti/qperf.git
-sudo apt update && sudo apt install python3-virtualenv
 export NETSQUIDPYPI_USER=user1234
 export NETSQUIDPYPI_PWD=password1234
+sudo apt update && sudo apt install -y python3-virtualenv
+git clone https://github.com/ccicconetti/qperf.git
+cd qperf
 thirdparty/setup.sh
 source .venv/bin/activate
 python experiments/qperf.py --help
