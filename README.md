@@ -1,6 +1,6 @@
 # qperf
 
-A quantum link performance measurement tool.
+A quantum link performance measurement tool, winner of the [Quantum Internet Application Challenge 2023](https://quantuminternetalliance.org/2023/11/21/qia-concludes-quantum-internet-application-challenge-2023-names-best-submission/).
 
 ## Motivation
 
