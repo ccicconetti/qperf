@@ -2,6 +2,8 @@
 
 A quantum link performance measurement tool, winner of the [Quantum Internet Application Challenge 2023](https://quantuminternetalliance.org/2023/11/21/qia-concludes-quantum-internet-application-challenge-2023-names-best-submission/).
 
+Unrelated tools with the same name include: [performance measurement for QUIC](https://github.com/rbruenig/qperf) and [bandwidth/latency measurement for RDMA](https://github.com/linux-rdma/qperf).
+
 ## Motivation
 
 The Quantum Internet of the future will offer its users end-to-end entanglement of qubits to enable a whole ecosystem of distributed quantum applications.
