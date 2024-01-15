@@ -6,6 +6,8 @@ import time
 import argparse
 import pandas as pd
 
+from statistics import mean
+
 from qiskit import (
     QuantumCircuit,
     QuantumRegister,
@@ -13,8 +15,8 @@ from qiskit import (
 )
 from qiskit.circuit import Qubit, Clbit
 
-from utils import NoiseModelWrapper
-
+from noise_model_wrapper import NoiseModelWrapper
+from utils import to_sec
 
 logger = logging.getLogger(__name__)
 
@@ -37,7 +39,15 @@ def teleport(
     qc.x(q3).c_if(crx, 1)
 
 
-def make_circuit():
+def make_circuit(num_filler_gates: int):
+    """Create a circuit that performs teleportation of two qubits and a swap test
+
+    Parameters
+    ----------
+    num_filler_gates: int
+        The number of filler gates to be added before the swap test
+    """
+
     # Initialize circuit and registers
     psi1 = QuantumRegister(1, "psi1")
     phi1 = QuantumRegister(2, "phi1")
@@ -46,8 +56,10 @@ def make_circuit():
     phi2 = QuantumRegister(2, "phi2")
     c2 = ClassicalRegister(2, "c2")
     ancilla = QuantumRegister(1, "ancilla")
+    outfiller = ClassicalRegister(2, "outfiller")
+    filler = QuantumRegister(2, "filler")
     out = ClassicalRegister(1, "out")
-    qc = QuantumCircuit(psi1, phi1, c1, psi2, phi2, c2, ancilla, out)
+    qc = QuantumCircuit(psi1, phi1, c1, psi2, phi2, c2, ancilla, filler, outfiller, out)
 
     # Initialize |psi> qubits to be teleported to the same random state
     theta = random.uniform(0, math.pi)
@@ -67,6 +79,25 @@ def make_circuit():
     teleport(qc, psi2, phi2[0], phi2[1], c2[0], c2[1])
     qc.barrier()
 
+    # Add delay
+    # note: cannot use qc.delay() as this cannot be transpiled on a real QC
+    if num_filler_gates > 0:
+        qc.h(filler[0])
+        qc.h(filler[1])
+        for i in range(num_filler_gates):
+            if i % 4 == 0:
+                qc.cx(filler[0], filler[1])
+            elif i % 4 == 1:
+                qc.rz(random.uniform(0, 2 * math.pi), filler[0])
+            elif i % 4 == 2:
+                qc.cx(filler[1], filler[0])
+            else:
+                assert i % 4 == 3
+                qc.rz(random.uniform(0, 2 * math.pi), filler[1])
+
+        qc.measure(filler, outfiller)
+        qc.barrier()
+
     # Implement swap test
     qc.h(ancilla)
     qc.cswap(ancilla, phi1[1], phi2[1])
@@ -84,13 +115,13 @@ def analyze_results(result, shots: int) -> float:
     for k, v in result.get_counts().items():
         logger.debug(f"{k}: {v}")
         total += v
-        if k[0] == "0":
+        if k[0] == "1":
             counter += v
     assert total == shots
 
-    ratio = counter / total
-    logger.info("success ratio: {}".format(ratio))
-    return ratio
+    estimated_fidelity = 1.0 - (2.0 * counter) / total
+    logger.info("estimated fidelity: {}".format(estimated_fidelity))
+    return estimated_fidelity
 
 
 def main():
@@ -125,6 +156,12 @@ def main():
     parser.add_argument(
         "--num-samples", type=int, default=1024, help="Number of samples per experiment"
     )
+    parser.add_argument(
+        "--delay",
+        type=float,
+        default=0,
+        help="Delay to be added before swap test, in us",
+    )
     args = parser.parse_args()
 
     # Initialize pseudo-random number generator seed
@@ -136,21 +173,36 @@ def main():
     ch.setLevel(log_level)
     logging.getLogger(__name__).setLevel(log_level)
     logger.addHandler(ch)
-    logging.getLogger("utils").setLevel(log_level)
-    logging.getLogger("utils").addHandler(ch)
+    logging.getLogger("noise_model_wrapper").setLevel(log_level)
+    logging.getLogger("noise_model_wrapper").addHandler(ch)
 
     # Load backend
     noise_model_wrapper = NoiseModelWrapper(backend_name=args.backend, no_save=False)
+
+    # Check backend properties
+    properties = noise_model_wrapper.backend_properties()
+    gate_durations = []
+    if properties is not None:
+        for gate in properties.gates:
+            if str(gate.gate).lower() == "x":
+                for param in gate.parameters:
+                    if param.name == "gate_length":
+                        gate_durations.append(to_sec(param.value, param.unit))
+    avg_gate_duration = mean(gate_durations)
+    num_filler_gates = int(round(1e-6 * args.delay / avg_gate_duration))
+    logger.info(
+        f"average gate duration: {avg_gate_duration} s ({num_filler_gates} filler gates)"
+    )
 
     # Execute experiment
     ts_start = time.time()
     data = []
     for ndx_experiment in range(args.num_experiments):
         # Create circuit
-        qc = make_circuit()
+        qc = make_circuit(num_filler_gates=num_filler_gates)
 
         # Run simulation
-        result = noise_model_wrapper.execute(qc, shots=args.num_samples)
+        result = noise_model_wrapper.execute(qc, shots=args.num_samples, seed=args.seed)
 
         # Analyze results
         data.append(
