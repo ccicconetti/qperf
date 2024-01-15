@@ -49,7 +49,7 @@ def compute_s(outer_list: list) -> float:
     Returns
     -------
     float
-        The different between 1 and twice the expectation of the values passed.
+        The difference between 1 and twice the expectation of the values passed.
     """
     sum = 0.0
     count = 0
